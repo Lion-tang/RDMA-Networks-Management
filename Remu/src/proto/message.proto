@@ -1,0 +1,336 @@
+syntax = "proto3";
+
+message VersionRequest { }
+
+message VersionResponse{
+    string version = 1;
+}
+
+message OpenDeviceRequest {
+    string dev_name = 1;
+    uint64 access_flag = 2;
+    uint32 gid_idx = 3;
+    uint32 ib_port_num = 4;
+    uint32 timeout = 5;
+    uint32 retry = 6;
+    uint32 rnr_retry = 7;
+    uint32 mtu = 8;
+    uint32 sq_start_psn = 9;
+    uint32 rq_start_psn = 10;
+    uint32 max_rd_atomic = 11;
+    uint32 max_dest_rd_atomic = 12;
+    uint32 min_rnr_timer = 13;
+    uint32 imm_flag = 14;
+    uint32 cq_size = 15;
+    uint32 max_cqe = 16;
+    uint64 cc_event_timeout = 17;
+    enum CqPollTriggerType {
+        Auto = 0;
+        Manual = 1;
+    }
+    CqPollTriggerType cq_poll_trigger = 18;
+}
+
+message OpenDeviceResponce {
+    string dev_name = 1;
+    uint32 qp_num = 2;
+    uint32 lid = 3;
+    bytes gid_raw = 4;
+}
+
+message CreatePdRequest {
+    string dev_name = 1;
+}
+
+message CreatePdResponse {
+    uint32 pd_id = 1;
+}
+
+message CreateMrRequest {
+    uint32 pd_id = 1;
+    uint64 flag = 2;
+    uint64 len = 3;
+    string dev_name = 4;
+}
+
+message CreateMrResponse {
+    uint64 addr = 1;
+    uint64 len = 2;
+    uint32 rkey = 3;
+    uint32 lkey = 4;
+    uint32 mr_id = 5;
+}
+
+message CreateCqRequest {
+    string dev_name = 1;
+    uint32 cq_size = 2;
+}
+
+message CreateCqResponse {
+    uint32 cq_id = 1;
+}
+
+message CreateQpRequest {
+    uint32 pd_id = 1;
+    enum QpType {
+        RC = 0;
+        UC = 1;
+    }
+    QpType qp_type = 2;
+    uint32 cq_id = 3;
+}
+
+message CreateQpResponse {
+    uint32 qp_id = 1;
+    uint32 qp_num = 2;
+}
+
+message QueryPortRequest {
+    string dev_name = 1;
+    uint32 ib_port_num = 2;
+}
+
+message QueryPortResponse {
+    uint32 lid = 1;
+}
+
+message QueryGidRequest {
+    string dev_name = 1;
+    uint32 ib_port_num = 2;
+    uint32 gid_idx = 3;
+}
+
+message QueryGidResponse {
+    bytes gid_raw = 1;
+}
+
+message ConnectQpRequest {
+    string dev_name = 1;
+    uint32 qp_id = 2;
+    uint64 access_flag = 4;
+
+    uint32 gid_idx = 8;
+    uint32 ib_port_num = 7;
+    uint32 remote_qp_num = 3;
+    uint32 remote_lid = 5;
+    bytes remote_gid = 6;
+
+    uint32 timeout = 9;
+    uint32 retry = 10;
+    uint32 rnr_retry = 11;
+
+    uint32 mtu = 12;
+    uint32 sq_start_psn = 13;
+    uint32 rq_start_psn = 14;
+    uint32 max_rd_atomic = 15;
+    uint32 max_dest_rd_atomic = 16;
+    uint32 min_rnr_timer = 17;
+    
+}
+
+message ConnectQpResponse {
+}
+
+message RemoteReadRequest {
+    uint64 addr = 1;
+    uint32 len = 2;
+    uint32 lkey = 3;
+    uint64 remote_addr = 4;
+    uint32 remote_key = 5;
+    uint32 qp_id = 6;
+    uint32 cq_id = 7;
+    bool real_send = 8;
+    uint32 mr_id = 9;
+    string dev_name = 10;
+    bool allow_err = 11;
+}
+
+message RemoteReadResponse {
+}
+
+message LocalWriteRequest {
+    uint32 mr_id = 1;
+    uint32 offset = 2;
+    uint32 len = 3;
+    bytes content = 4;
+    string dev_name = 5;
+}
+
+message LocalWriteResponse {
+}
+
+message UnblockRetryRequest {
+}
+
+message UnblockRetryResponse {
+}
+
+message LocalCheckMemRequest {
+    uint32 mr_id = 1;
+    repeated uint32 offset = 2;
+    repeated bytes expected = 3;
+}
+
+message LocalCheckMemResponse {
+    bool same = 1;
+}
+
+message RecvPktRequest {
+    uint32 wait_for_retry = 1;
+    bool poll_cqe = 2;
+    uint32 qp_id = 3;
+    uint32 cnt = 4;
+    oneof check_pkt_option {
+        bytes check_pkt = 5;
+    }
+    bool real_recv = 6;
+}
+
+message RecvPktResponse {
+    uint32 opcode = 1;
+    bool check_pass = 2;
+}
+
+message LocalRecvRequest {
+    uint64 addr = 1;
+    uint32 len = 2;
+    uint32 lkey = 3;
+    uint32 qp_id = 6;
+    uint32 cq_id = 7;
+    uint32 mr_id = 8;
+    string dev_name = 9;
+    uint32 imm = 10;
+}
+
+message LocalRecvResponse {}
+
+message RemoteSendRequest {
+    uint64 addr = 1;
+    uint32 len = 2;
+    uint32 lkey = 3;
+    uint32 qp_id = 4;
+    uint32 cq_id = 5;
+    uint32 mr_id = 6;
+    string dev_name = 7;
+    bool allow_err = 8;
+}
+
+message RemoteSendResponse {}
+
+message RemoteWriteRequest {
+    uint64 addr = 1;
+    uint32 len = 2;
+    uint32 lkey = 3;
+    uint64 remote_addr = 4;
+    uint32 remote_key = 5;
+    uint32 qp_id = 6;
+    uint32 cq_id = 7;
+    uint32 mr_id = 8;
+    string dev_name = 9;
+    bool allow_err = 10;
+}
+
+message RemoteWriteResponse {
+}
+
+message RemoteAtomicCasRequest {
+    uint64 addr = 1;
+    uint32 lkey = 2;
+    uint64 remote_addr = 3;
+    uint32 remote_key = 4;
+    uint64 old_value = 5;
+    uint64 new_value = 6;
+    uint32 qp_id = 7;
+    uint32 cq_id = 8;
+    string dev_name = 9;
+    bool allow_err = 10;
+}
+
+message RemoteAtomicCasResponse {
+}
+
+message PollCompleteRequest {
+    uint32 cq_id = 1;
+    uint32 qp_id = 2;
+    oneof sqpn_option {
+        uint32 sqpn = 3;
+    }
+    oneof qpn_option {
+        uint32 qpn = 4;
+    }
+    oneof len_option {
+        uint32 len = 5;
+    }
+    oneof opcode_option {
+        uint32 opcode = 6;
+    }
+    oneof status_option {
+        uint32 status = 7;
+    }
+    oneof imm_or_rkey_option {
+        uint32 imm_data_or_inv_rkey = 8;
+    }
+}
+
+message PollCompleteResponse {
+    bool same = 1;
+}
+
+message CheckQpStatusRequest {
+    uint32 status = 1;
+    string dev_name = 2;
+    uint32 qp_id = 3;
+}
+
+message CheckQpStatusResponse {
+    bool same = 1;
+}
+
+message ModifyQpRequest {
+    uint32 qp_id = 1;
+    uint32 sq_psn = 2;
+}
+
+message ModifyQpResponse {
+}
+
+message RemoteWriteImmRequest {
+    uint64 addr = 1;
+    uint32 len = 2;
+    uint32 lkey = 3;
+    uint64 remote_addr = 4;
+    uint32 remote_key = 5;
+    uint32 imm_data = 6;
+    uint32 qp_id = 7;
+    uint32 cq_id = 8;
+    uint32 send_flag = 9;
+    uint32 mr_id = 10;
+    string dev_name = 11;
+    bool allow_err = 12;
+}
+
+message RemoteWriteImmResponse {
+}
+
+message NotifyCqRequest {
+    uint32 cq_id = 1;
+    uint32 solicited_only = 2;
+}
+
+message NotifyCqResponse {
+}
+
+message SetHookRequest {
+    uint32 qp_id = 1;
+    enum HookType {
+        Send = 0;
+        Recv = 1;
+        RESP = 2;
+    }
+    HookType hook_type = 2;
+    string hook_name = 3;
+}
+
+message SetHookResponse {
+    bool is_success = 1;
+}

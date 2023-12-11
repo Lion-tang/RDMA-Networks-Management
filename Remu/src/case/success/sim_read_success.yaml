@@ -1,0 +1,26 @@
+side_1: 
+  - name: prepare
+  - name: connect_qp
+  - name: local_write
+    offset: 0
+    content: 'ff'
+  - name: barrier
+side_2:
+  - name: prepare
+  - name: connect_qp
+  - name: barrier
+  - name: remote_read
+    len: 1
+  - name: recv_pkt
+    poll_cqe: false
+    opcode: RDMA_READ_RESPONSE_ONLY
+  - name: poll_complete
+    len: 1
+    opcode: RDMA_READ
+    status: SUCCESS
+  - name: local_check
+    seg: 
+      - offset: 0
+        expected: 'ff'
+  - name: check_qp_status
+    status: RTS

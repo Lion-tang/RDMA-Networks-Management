@@ -1,0 +1,29 @@
+syntax = "proto3";
+import "proto/message.proto";
+
+service Side {
+    rpc Version(VersionRequest) returns (VersionResponse) {}
+    rpc OpenDevice(OpenDeviceRequest) returns (OpenDeviceResponce) {}
+    rpc CreatePd(CreatePdRequest) returns (CreatePdResponse) {}
+    rpc CreateMr(CreateMrRequest) returns (CreateMrResponse) {}
+    rpc CreateQp(CreateQpRequest) returns (CreateQpResponse) {}
+    rpc CreateCq(CreateCqRequest) returns (CreateCqResponse) {}
+    rpc QueryPort(QueryPortRequest) returns (QueryPortResponse) {}
+    rpc QueryGid(QueryGidRequest) returns (QueryGidResponse) {}
+    rpc ConnectQp(ConnectQpRequest) returns (ConnectQpResponse) {}
+    rpc RemoteRead(RemoteReadRequest) returns (RemoteReadResponse) {}
+    rpc LocalWrite(LocalWriteRequest) returns (LocalWriteResponse) {}
+    rpc LocalCheckMem(LocalCheckMemRequest) returns (LocalCheckMemResponse) {}
+    rpc RecvPkt(RecvPktRequest) returns (RecvPktResponse) {}
+    rpc UnblockRetry(UnblockRetryRequest) returns (UnblockRetryResponse) {}
+    rpc LocalRecv(LocalRecvRequest) returns (LocalRecvResponse) {}
+    rpc RemoteSend(RemoteSendRequest) returns (RemoteSendResponse) {}
+    rpc RemoteWrite(RemoteWriteRequest) returns (RemoteWriteResponse) {}
+    rpc RemoteAtomicCas(RemoteAtomicCasRequest) returns (RemoteAtomicCasResponse) {}
+    rpc PollComplete(PollCompleteRequest) returns (PollCompleteResponse) {}
+    rpc CheckQpStatus(CheckQpStatusRequest) returns (CheckQpStatusResponse) {}
+    rpc ModifyQp(ModifyQpRequest) returns (ModifyQpResponse) {}
+    rpc RemoteWriteImm(RemoteWriteImmRequest) returns (RemoteWriteImmResponse) {}
+    rpc NotifyCq(NotifyCqRequest) returns (NotifyCqResponse) {}
+    rpc SetHook(SetHookRequest) returns (SetHookResponse) {}
+}
