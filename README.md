@@ -1,5 +1,9 @@
-# Data privacy protection in RDMA networks
-environment preparation:
+# RDMA Networks Management: Unveiling Vulnerabilities,Cryptographic Enhancement
+
+- [Install Driver](#install-driver)
+- [Install RDMA-Core (Optional, but Required for SoftRoCE Running on Linux OS)](#install-rdma-core)
+- [RDMA Related Command](#rdma-related-command)
+- [Usual Command Cases](#usual-command-cases)
 
 ## install driver
 
@@ -35,6 +39,19 @@ sudo hca_self_test.ofed
 ```
 
 if there is no failed text, then install driver successfully
+
+## install rdma-core
+optional but required for SoftRoCE runnning on Linux OS:
+```
+sudo apt-get install libibverbs1 ibverbs-utils librdmacm1 libibumad3 ibverbs-providers rdma-core
+sudo apt-get install iproute2
+sudo apt-get install perftest  # for ib_write_bw, ib_write_lat, ib_read_bw, ib_read_lat
+sudo modprobe rdma_rxe  # load rxe kernel module
+sudo rdma link add rxe_0 type rxe netdev ens33 # rxe_0 is the name of rxe device, ens33 is the name of network card
+rdma link # check rxe device status
+```
+
+
 
 ## RDMA related command
 
@@ -72,8 +89,6 @@ sudo /sbin/connectx_port_config  switch current operating mode
 lsmod                            see which modules are loaded
 ofed_info                        show ofed package info
 ```
-
-
 
 ## Usual command cases
 
