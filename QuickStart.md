@@ -72,17 +72,29 @@
 ## Completion Queue(CQ)
 
 1. 什么是CQ？
-2. CQE是什么？
-3. 为什么要使用CQ？
-4. 怎么使用CQ？
+2. WQ和CQ之间的对应关系是什么？一对一还是一对多，还是多对多？
+3. CQE是什么？
+4. CQC是什么？
+5. 为什么要使用CQ？
+6. 怎么使用CQ？
+7. 能否不产生CQE？
+8. CQ 错误类型有哪些？
+9. CQ的处理方式有哪些？
 
 ## Address Handle
 
-
+1. AH 是什么？
+2. 为什么要使用AH？
+3. 怎么使用AH？
 
 ## Memory Window(MW)
 
-
+1. MW是什么？
+2. 为什么要使用MW?
+3. 使用MW时，对MR有什么权限要求？
+4. MW有几种类型？
+5. 怎么使用MW?
+6. MW如何回收rkey？
 
 # 回答 A
 
@@ -121,7 +133,7 @@
 
 ## 传输模式（服务类型）
 
-1. 服务稳定性（Reliability）和连接类型（Conection）两两组合形成RC/RD/UC/UD。
+1. 服务稳定性（Reliability）和连接类型（Conection）两两组合形成RC/RD/UC/UD。连接类型服务会收到 ACK, 无连接类型不会收到ACK
 
 |                  | 可靠（Reliable）        | 不可靠（Unreliable）     |
 | ---------------- | ----------------------- | ------------------------ |
@@ -164,28 +176,90 @@
 
 1. MR其实是驱动注册的一块内存区域，用于收发数据的。下发一个WQE，其中包含的sge用于指定该WQE使用的内存地址，该地址应该在MR范围内。
 2. 1. 让硬件知道VA to PA 的转换。CPU的VA直接给硬件硬件是看不懂的，硬件会创建一个他看得懂的VA to PA 映射表
-    2. MR约束硬件访问内存的范围
-    3. **Pin**住这块内存，保持虚拟地址到物理地址的映射关系。防止换页后，硬件不知道物理页更换，继续对换页后的物理内存操作
+     2. MR约束硬件访问内存的范围
+     3. **Pin**住这块内存，保持虚拟地址到物理地址的映射关系。防止换页后，硬件不知道物理页更换，继续对换页后的物理内存操作
 3. `ibv_reg_mr()` 注册MR，需要指定所属PD
 
 ## Queue Pair(QP)
 
 1. QPC是QP的上下文（Queue Pair Context），**主要给硬件看，用来同步软硬之间同步的QP信息**，方便硬件直接操作内存，比如QP Buffer 的DMA地址，本地QPN，max_send_wr, max_recv_wr, max_send_sge, max_recv_sge 这些信息
-2. QP是工作队列，每个QP有个编号QPN（一般最大2^24个), 一个QP分为WQ,CQ, WQ细分为SQ和RQ
+2. QP是工作队列，每个QP有个编号QPN（一般最大2^24个)。QP0和QP1用于特殊保留用途，QP0用于子网管理接口SMI。QP1用于通用服务接口GSI，其中最常用的服务就是CM建链。一个QP分为WQ,CQ, WQ细分为SQ和RQ
 3. 本人理解类似于TCP多个端口一样，RDMA每个QP就标识一个RDMA服务，并且以QP为单位进行读、写、以及即将介绍的任务完成(CQ)更方便管理
 4. `ibv_create_qp(pd, qp_attr)`，创建QP后需要将QP修改为可工作状态
     1. RST(Reset)，create之后就处于这个状态，这个状态的QP什么都做不了
     2. INIT(initialized)，可以Post Receive WR，收到消息不会被处理，会被默认丢弃。如果用户下发Post Send WR，会报错。这个阶段指定QP访问的**Flags**
     3. RTR(Ready to Receive)在INIT基础上可以处理接收到的消息，将WQE数据搬到Recv sge指定的内存位置，即RQ可以正常工作，这个时候需要指定 **DestQPN, PSN, DestLID, DestGID**。这个状态SQ仍然不能工作
-    4. 在RTR基础上，SQ可以正常工作，即用户可以Post Send WR，这个时候需要指定 **timeout, retry_cnt, rnr_retry**
+    4. RTS(Ready to Send)，在RTR基础上，SQ可以正常工作，即用户可以Post Send WR，这个时候需要指定 **timeout, retry_cnt, rnr_retry**
+    5. SQD(Send Queue Drain)，SQ排空状态，把现有SQ队列所有没处理的WQE全部处理掉，APP可以下发新的WQE，但是得等到旧的WQE全处理后才会被处理
+    6. SQE(Send Queue Error)，SQ错误状态，仅限RTS和SQD发生Send WR Completion Error才会转变到SQE
+    7. ERR，错误状态，INIT, RTR,RTS, SQD发生处理错误或者SQE 产生Receive WR Completion Error or Async Error 会进入该状态。如果QP进入该状态，QP会停止处理所有WQE, 已经处理到一半的WQE也会停止。上层需要在修复错误后将QP重新切换到RTS初始状态。
 
 ## Completion Queue(CQ)
 
+1. Completion Queue(CQ) 可以看作任务完成队列，通常一个QP包含一个SQ, RQ, CQ，也就是说一个QP中SQ和RQ的CQ是同一个
 
+2. 一对多的关系。**每个WQ都必须关联一个CQ，而每个CQ可以关联多个SQ和RQ**。**同一个WQ中的WQE，其对应的CQE间是保序的**，**不同WQ中的WQE，其对应的CQE间是不保序的**
+
+3. Completion Queue Entry/Element(CQE) ，每一个 WQE完成后会产生一个对应的 CQE 放到CQ中，用户态驱动将CQE解析并转换为 WC 告知APP
+
+4. CQC类似于QPC，是放在内存中记录CQ DMA地址、容量、CQN（CQN类似于QPN）的数据。用于给硬件看的。
+
+5. 事实上CQ是用于说明WQ完成的情况，以此来判断WQ是否正常执行。每一个CQE包含了WQE指定的QPN, WR ID。WR 操作类型，opcode。本次任务执行成功/失败，如果失败，那原因是什么，即status和错误码。
+
+6. `wr.send_flags = IBV_SEND_SIGNALED` 则声明WR将产生WC。
+
+7. 处理WQ的完成情况是需要消耗资源的。首先是RNIC需要产生CQE，其次是poll CQ，最后读取WC并检查其状态。减少WC的处理是能够减少APP CPU使用情况的。RDMA用户态支持声明不产生CQE，名为Unsignal Completion Queue。具体使用方法有两步。1.创建QP时，确保QP的 `ibv_qp_init_attr.sq_sig_all = 0`，这一个属性确保QP支持Unsignal Completion。2. 每一次post Send WR时，`wr.send_flags = 0` ，WC将不会产生（如果Send WR Error，还是会产生WC，并且是Send WR Completion Error)。
+
+8. 三种错误类型，**立即错误**（immediate error）、**完成错误**（Completion Error）以及**异步错误**（Asynchronous Errors)。举例子说明：
+
+    1. 立即错误。用户在Post Send时传入了非法的操作码，比如想在UD的时候使用RDMA WRITE操作。结果：产生**立即错误**（有的厂商在这种情况会产生完成错误）一般这种情况下，驱动程序会直接退出post send流程，并返回错误码给上层用户。注意此时WQE还没有下发到硬件就返回了
+    2. 完成错误。用户下发了一个WQE，操作类型为SEND，但是长时间没有收到对方的ACK。结果：产生**完成错误**，因为WQE已经到达了硬件，所以硬件会产生对应的CQE，CQE中包含超时未响应的错误详情
+    3. 异步错误。用户态下发了多个WQE，所以硬件会产生多个CQE，但是软件一直没有从CQ中取走CQE，导致CQ溢出。结果：产生**异步错误**，因为软件一直没取CQE，所以自然不会从CQE中得到信息。此时IB框架会调用软件注册的事件处理函数，来通知用户处理当前的错误。
+
+    可以看出错误检测的基本原则是WQE下发前的错误，那就是**立即错误**， 如果是ACK异常或者WQE下发之后的错误就是**完成错误**，如果是溢出等错误，则是**异步错误**。
+
+    几种常见的**完成错误**：
+
+    - RC服务类型的SQ完成错误
+    - Local Protection Error
+        本地保护域错误。本地WQE中指定的数据内存地址的MR不合法，即用户试图使用一片未注册的内存中的数据。
+    - Remote Access Error
+        远端权限错误。本端没有权限读/写指定的对端内存地址。
+    - Transport Retry Counter Exceeded Error
+        重传超次错误。对端一直未回复正确的ACK，导致本端多次重传，超过了预设的次数。
+    - RC服务类型的RQ完成错误
+    - Local Access Error
+        本地访问错误。说明对端试图写入其没有权限写入的内存区域。
+    - Local Length Error
+        本地长度错误。本地RQ没有足够的空间来接收对端发送的数据。
+
+9. IB给上层用户两种处理CQ的方式，**中断**和**轮询**， 中断则是CPU保护现场，停下来处理CQE，处理完后，跳回CPU现场。轮询是隔一段时间CPU检查网卡是否有CQE，有CQE，就把缓冲区的CQE带出来处理。通常还是轮询用的多一些。两种上层接口 poll 和 notification, 对应着轮询和中断模式。
 
 ## Address Handle
 
-
+1. AH全称为Address Handle， RC的对端信息是创建QP的时候存储在QPC中的。UD的QP间没有连接关系，QP想发给谁就发给谁，所以WQE中有一个地址簿用于查询对端的信息，每次通过一个索引来指定地址簿中的一个地址信息，这个索引就是AH。
+2. IB协议中并没有对为什么使用AH做出解释。不过猜测是向用户隐藏底层地址细节等。
+3. 每次在wr中指定ah，`wr.wr.ud.ah` 设定之后，还需要设定`wr.wr.ud.remote_qpn`和`wr.wr.ud.remote_qkey`
 
 ## Memory Window(MW)
+
+1. Memory Window简称MW，每个MW都会绑定（称为bind）在一个已经注册的MR上，但是它相比于MR可以提供更灵活的权限控制。一个MR上可以划分出很多MW，每个MW都可以设置自己的权限。MW/MR根据本端/对端和读/写两两组合形成了4种权限：
+
+|       | Local       | Remote       |
+| ----- | ----------- | ------------ |
+| Read  | Local Read  | Remote Read  |
+| Write | Local Write | Remote Write |
+
+2. MR是内核管理的，想要修改一个已经存在MR的耗时较长。MW在创建好之后，可以通过数据路径（即通过用户态直接下发WR到硬件的方式）动态的绑定到一个已经注册的MR上，并同时设置或者更改其访问权限，这个过程的速度远远超过重新注册MR的过程。安全性方面，目前现有的RDMA权限类攻击使用MW都是可以避免的，但是注意，每个MW会存储MW对应的rkey和QPN。
+3. **如果想要给MW配置远程写或者远程原子操作（Atomic）权限，那么它绑定到的MR必须有本地写权限，其他情况下两者权限互不干扰**：远端用户用MW，就要遵循MW的权限配置；远端用户用MR，就要遵循MR的权限配置。
+4. 在具体Bind之前要介绍两种MW,简单来说MW Type1是rkey的key由硬件控制，所以不能自行调用invalidate 销毁rkey，只能重新Bind，原来的rkey自动销毁。MW Type2是用户控制rkey的key段，Type2 支持invalidate 让一个rkey失效，要重新分配一个rkey到一个MW，必须先Invalidate。IB规范支持多个Type1 或 多个Type2 MW绑定到同一个MR，并且范围可以相互覆盖。
+5. 要使用MW，首先要注册MW（控制面），其次是绑定MW到MR(数据面)。控制面支持增删查，Allocate MW, Deallocate MW, Query MW。数据面有两类接口Bind和Invalidate，Bind是将MW绑定到一个已经注册的MR指定范围上，并配置想要的权限。绑定的结果会产生一个rkey。如果一个MR还有被绑定的MW，那么这个MR是不能被取消注册的。Bind有两种方式，Post Send Bind MW WR只适用于Type2 MW。 Bind MW 实际上在Post Send Bind MW WR外面封了一层，这种方式仅适用于Type1 MW。下表是两种方式的区别。
+
+|                      | Bind MW（for Type1 MW) | Post Send Bind MW WR (for Type2 MW) |
+| -------------------- | ---------------------- | ----------------------------------- |
+| 准备WR参数           | ✅                      | -                                   |
+| 下发WR               | ✅                      | ✅                                   |
+| 返回key（index部分） | ✅                      | -                                   |
+
+6. Invalidate是上个问题中数据面的一类接口，同时也是回收rkey的接口， 只适用于 Type2 MW。**Invalidate操作的对象是R_Key而不是MW本身**，即Invalidate之后的效果是：远端用户无法再使用这个R_Key访问对应的MW，而**MW资源仍然存在**，以后仍然可以生成新的R_Key给远端使用。根据 invalidate发起方不同，Post Send Bind MW WR 可以让本地或远端的MW rkey 被 invalidate 掉。
 
