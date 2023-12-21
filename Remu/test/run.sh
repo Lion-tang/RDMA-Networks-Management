@@ -13,12 +13,13 @@ CONTAINER_SERVER_IP="10.1.1.48"
 CONTAINER_CLIENT_IP="10.1.1.64"
 CONTAINER_IP="10.1.1.48"
 GRPC_PORT="9000"
+LINK_DEV="eth0"
 
 # Create MacVLAN network for container to assign static IP
-docker network create -d macvlan --subnet=$CONTAINER_NET --ip-range=$CONTAINER_NET -o macvlan_mode=bridge -o parent=eth0 $DOCKER_NETWORK
+docker network create -d macvlan --subnet=$CONTAINER_NET --ip-range=$CONTAINER_NET -o macvlan_mode=bridge -o parent=$LINK_DEV $DOCKER_NETWORK
 # Make host and container accessible
 # https://rehtt.com/index.php/archives/236/
-sudo ip link add $LINK_DEV_NAME link eth0 type macvlan mode bridge
+sudo ip link add $LINK_DEV_NAME link $LINK_DEV type macvlan mode bridge
 sudo ip addr add $LINK_DEV_IP dev $LINK_DEV_NAME
 sudo ip link set $LINK_DEV_NAME up
 sudo ip route add ${CONTAINER_NET} dev $LINK_DEV_NAME
