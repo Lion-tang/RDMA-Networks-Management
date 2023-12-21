@@ -1,4 +1,29 @@
-《RDMA杂谈》专栏目前是国内RDMA科普文章中质量最好的刊栏了，作者从RDMA技术的背景、基础资源知识、模拟程序的安装、内存地址基础、Buffer 工作机制等角度由浅入深地介绍了 RDMA。本说明旨在从一个普通读者的角度，记录阅读《RDMA杂谈》之后的思考和问题，通过这些问题，读者可以思考并检验一下对 RDMA 的理解程度，毕竟阅读之后要有一定的思考才能内化为自己的理解。
+- [问题 Q](#问题-q)
+    - [概述](#q-概述)
+    - [基本元素](#q-基本元素)
+    - [操作类型](#q-操作类型)
+    - [传输模式](#q-传输模式)
+    - [TCP建链](#q-tcp建链)
+    - [Protection Domain](#q-protection-domain)
+    - [Memory Region](#q-memory-region)
+    - [Queue Pair](#q-queue-pair)
+    - [Completion Queue](#q-completion-queue)
+    - [Address Handle](#q-address-handle)
+    - [Memory Window](#q-memory-window)
+- [回答 A](#回答-a)
+    - [概述](#a-概述)
+    - [基本元素](#a-基本元素)
+    - [操作类型](#a-操作类型)
+    - [传输模式](#a-传输模式)
+    - [TCP建链](#a-tcp建链)
+    - [Protection Domain](#a-protection-domain)
+    - [Memory Region](#a-memory-region)
+    - [Queue Pair](#a-queue-pair)
+    - [Completion Queue](#a-completion-queue)
+    - [Address Handle](#a-address-handle)
+    - [Memory Window](#a-memory-window)
+
+《RDMA杂谈》专栏目前是RDMA科普文章中质量最好的刊栏了，作者从RDMA技术的背景、基础资源知识、模拟程序的安装、内存地址基础、Buffer 工作机制等角度由浅入深地介绍了 RDMA。本说明旨在从一个普通读者的角度，记录阅读《RDMA杂谈》之后的思考和问题，通过这些问题，读者可以思考并检验一下对 RDMA 的理解程度，毕竟阅读之后要有一定的思考才能内化为自己的理解。
 
 
 
@@ -6,7 +31,7 @@
 
 # 问题 Q
 
-## 概述
+## Q 概述
 
 1. RDMA 优势是什么？
 2. RDMA 具体实现协议有哪些？
@@ -15,7 +40,7 @@
 
 
 
-## 基本元素
+## Q 基本元素
 
 | 缩写 | 全称                           |
 | ---- | ------------------------------ |
@@ -33,43 +58,43 @@
 1. WQ和WQE， CQ和CQE是容器和元素的关系，那能否描述WQE从软件下发到硬件的流程（无需考虑 Buffer）
 2. 描述一个完整 Send/Recv 流程
 
-## RDMA 操作类型
+## Q 操作类型
 
 1. 有几种操作类型？
 2. [基本元素](#基本元素)最后描述了Send/Recv流程，Write/Read的具体流程读者可以类比，但由于Write/Read是单端操作，和Send/Recv双端操作存在差异。具体在操作类型的流程上，差异是什么？
 
-## RDMA 传输模式（服务类型）
+## Q 传输模式
 
 1. 有几种常见的传输模式？
 2. 几种传输模式支持的操作类型是怎样的？
 
-## 建链（TCP）
+## Q TCP建链
 
 1. 建链是什么？
 2. 有哪些建链方式？
 3. 为什么要建链？
 4. 怎么建链？
 
-## Protection Domain(PD)
+## Q Protection Domain
 
 1. PD是什么？
 2. 为什么要用PD？
 3. 怎么使用PD？
 
-## Memory Region(MR)
+## Q Memory Region
 
 1. MR是什么？
 2. 为什么要使用MR？
 3. 怎么使用MR？
 
-## Queue Pair(QP)
+## Q Queue Pair
 
 1. 了解QP之前先了解什么是QPC?
 2. QP是什么？
 3. 为什么要使用QP?
 4. 怎么使用QP？
 
-## Completion Queue(CQ)
+## Q Completion Queue
 
 1. 什么是CQ？
 2. WQ和CQ之间的对应关系是什么？一对一还是一对多，还是多对多？
@@ -81,13 +106,13 @@
 8. CQ 错误类型有哪些？
 9. CQ的处理方式有哪些？
 
-## Address Handle
+## Q Address Handle
 
 1. AH 是什么？
 2. 为什么要使用AH？
 3. 怎么使用AH？
 
-## Memory Window(MW)
+## Q Memory Window
 
 1. MW是什么？
 2. 为什么要使用MW?
@@ -98,7 +123,7 @@
 
 # 回答 A
 
-## 概述
+## A 概述
 
 1. 【内核bypass】 和【CPU卸载】，相比于传统以太网，RDMA技术同时做到了**更高带宽**和**更低时延**
 
@@ -108,7 +133,7 @@
 
 
 
-## 基本元素
+## A 基本元素
 
 1. 以WQ和WQE为例，软件(APP)发起 WR，用户驱动转化为 WQE后放入WQ中，硬件从WQ中取出WQE工作
 
@@ -125,13 +150,13 @@
 
 
 
-## 操作类型
+## A 操作类型
 
 1. Send, Recv, Write, Read
 
 2. Send/Recv 组合的操作类型流程接收端会产生WQE和CQE， Write/Read 接收端不会产生WQE和CQE，事实上，WQE由软件产生，CQE由硬件产生，都存储在DDR内存，详情参考【QP Buffer】
 
-## 传输模式（服务类型）
+## A 传输模式（服务类型）
 
 1. 服务稳定性（Reliability）和连接类型（Conection）两两组合形成RC/RD/UC/UD。连接类型服务会收到 ACK, 无连接类型不会收到ACK
 
@@ -151,7 +176,7 @@
 
 
 
-## 建链（TCP）
+## A TCP建链
 
 1. RDMA建链指的是控制链，也就是说发送数据前的必要信息的准备。
 2. 建链工作可以由TCP，也可以由CM(comunication message protocol)完成，甚至两个机器如果就在面对面，可以靠人吼一声把必要信息填上也行。
@@ -166,13 +191,13 @@
 | r_key   | Remote key        |         | ✅             |         |
 | Q_key   | Queue key         |         |               | ✅       |
 
-## Protection Domain(PD)
+## A Protection Domain
 
 1. PD实际是一组资源集合（容器），例如一个PD包含了MR1,MR2, QP1,QP2。QP3并不能使用MR1，因为不在一个PD集合内。注意PD中MR和QP没有绑定关系，就是说MR1可以给QP1的WQE用，也可以给QP2的WQE用。另外注意，PD是**本地概念**，仅存在于节点内部，也就是说PD对远程节点来说是**不可见的**。但是MR是对远程节点可见的。
 2. 使用PD能够对资源做到隔离，目前现代攻击里面大多都是针对一个PD内多种资源的越权访问，因此最安全的情景是，一个PD，一个MR，一个QP。
 3. 使用`ibv_alloc_pd()`，IB协议中规定：**每个节点都至少要有一个PD，每个QP都必须属于一个PD，每个MR也必须属于一个PD。**
 
-## Memory Region(MR)
+## A Memory Region
 
 1. MR其实是驱动注册的一块内存区域，用于收发数据的。下发一个WQE，其中包含的sge用于指定该WQE使用的内存地址，该地址应该在MR范围内。
 2. 1. 让硬件知道VA to PA 的转换。CPU的VA直接给硬件硬件是看不懂的，硬件会创建一个他看得懂的VA to PA 映射表
@@ -180,7 +205,7 @@
      3. **Pin**住这块内存，保持虚拟地址到物理地址的映射关系。防止换页后，硬件不知道物理页更换，继续对换页后的物理内存操作
 3. `ibv_reg_mr()` 注册MR，需要指定所属PD
 
-## Queue Pair(QP)
+## A Queue Pair
 
 1. QPC是QP的上下文（Queue Pair Context），**主要给硬件看，用来同步软硬之间同步的QP信息**，方便硬件直接操作内存，比如QP Buffer 的DMA地址，本地QPN，max_send_wr, max_recv_wr, max_send_sge, max_recv_sge 这些信息
 2. QP是工作队列，每个QP有个编号QPN（一般最大2^24个)。QP0和QP1用于特殊保留用途，QP0用于子网管理接口SMI。QP1用于通用服务接口GSI，其中最常用的服务就是CM建链。一个QP分为WQ,CQ, WQ细分为SQ和RQ
@@ -194,7 +219,7 @@
     6. SQE(Send Queue Error)，SQ错误状态，仅限RTS和SQD发生Send WR Completion Error才会转变到SQE
     7. ERR，错误状态，INIT, RTR,RTS, SQD发生处理错误或者SQE 产生Receive WR Completion Error or Async Error 会进入该状态。如果QP进入该状态，QP会停止处理所有WQE, 已经处理到一半的WQE也会停止。上层需要在修复错误后将QP重新切换到RTS初始状态。
 
-## Completion Queue(CQ)
+## A Completion Queue
 
 1. Completion Queue(CQ) 可以看作任务完成队列，通常一个QP包含一个SQ, RQ, CQ，也就是说一个QP中SQ和RQ的CQ是同一个
 
@@ -221,7 +246,8 @@
     几种常见的**完成错误**：
 
     - RC服务类型的SQ完成错误
-    - Local Protection Error
+
+- Local Protection Error
         本地保护域错误。本地WQE中指定的数据内存地址的MR不合法，即用户试图使用一片未注册的内存中的数据。
     - Remote Access Error
         远端权限错误。本端没有权限读/写指定的对端内存地址。
@@ -235,13 +261,13 @@
 
 9. IB给上层用户两种处理CQ的方式，**中断**和**轮询**， 中断则是CPU保护现场，停下来处理CQE，处理完后，跳回CPU现场。轮询是隔一段时间CPU检查网卡是否有CQE，有CQE，就把缓冲区的CQE带出来处理。通常还是轮询用的多一些。两种上层接口 poll 和 notification, 对应着轮询和中断模式。
 
-## Address Handle
+## A Address Handle
 
 1. AH全称为Address Handle， RC的对端信息是创建QP的时候存储在QPC中的。UD的QP间没有连接关系，QP想发给谁就发给谁，所以WQE中有一个地址簿用于查询对端的信息，每次通过一个索引来指定地址簿中的一个地址信息，这个索引就是AH。
 2. IB协议中并没有对为什么使用AH做出解释。不过猜测是向用户隐藏底层地址细节等。
 3. 每次在wr中指定ah，`wr.wr.ud.ah` 设定之后，还需要设定`wr.wr.ud.remote_qpn`和`wr.wr.ud.remote_qkey`
 
-## Memory Window(MW)
+## A Memory Window
 
 1. Memory Window简称MW，每个MW都会绑定（称为bind）在一个已经注册的MR上，但是它相比于MR可以提供更灵活的权限控制。一个MR上可以划分出很多MW，每个MW都可以设置自己的权限。MW/MR根据本端/对端和读/写两两组合形成了4种权限：
 
