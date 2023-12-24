@@ -1,4 +1,3 @@
-# RDMA Talk
 - [问题 Q](#问题-q)
     - [概述](#q-概述)
     - [基本元素](#q-基本元素)
@@ -11,6 +10,7 @@
     - [Completion Queue](#q-completion-queue)
     - [Address Handle](#q-address-handle)
     - [Memory Window](#q-memory-window)
+    - [QP Buffer](#q-qp-buffer)
 - [回答 A](#回答-a)
     - [概述](#a-概述)
     - [基本元素](#a-基本元素)
@@ -23,12 +23,15 @@
     - [Completion Queue](#a-completion-queue)
     - [Address Handle](#a-address-handle)
     - [Memory Window](#a-memory-window)
+    - [QP Buffer](#a-qp-buffer)
 
 《RDMA杂谈》专栏目前是RDMA科普文章中质量最好的刊栏了，作者从RDMA技术的背景、基础资源知识、模拟程序的安装、内存地址基础、Buffer 工作机制等角度由浅入深地介绍了 RDMA。本说明旨在从一个普通读者的角度，记录阅读《RDMA杂谈》之后的思考和问题，通过这些问题，读者可以思考并检验一下对 RDMA 的理解程度，毕竟阅读之后要有一定的思考才能内化为自己的理解。
 
 
 
 接下来将按照《RDMA杂谈》的专栏的介绍顺序
+
+
 
 # 问题 Q
 
@@ -121,6 +124,17 @@
 4. MW有几种类型？
 5. 怎么使用MW?
 6. MW如何回收rkey？
+
+## Q Memory Basis
+
+1. MMIO 是什么？
+2. 外设如何DMA访问内存？如果启用IO虚拟地址后，外设又是如何访问内存的？
+
+## Q QP Buffer
+
+1. QPC等信息是存在RNIC中还是内存？
+2. RNIC 如何创建一个自己看得懂的 QPC？（控制路径） 
+3. RNIC 如何从内存中 DMA 取出一个 WQE？（数据路径）
 
 # 回答 A
 
@@ -289,4 +303,52 @@
 | 返回key（index部分） | ✅                      | -                                   |
 
 6. Invalidate是上个问题中数据面的一类接口，同时也是回收rkey的接口， 只适用于 Type2 MW。**Invalidate操作的对象是R_Key而不是MW本身**，即Invalidate之后的效果是：远端用户无法再使用这个R_Key访问对应的MW，而**MW资源仍然存在**，以后仍然可以生成新的R_Key给远端使用。根据 invalidate发起方不同，Post Send Bind MW WR 可以让本地或远端的MW rkey 被 invalidate 掉。
+
+## A Memory Basis
+
+1. MMIO是CPU访问PCIe外设的机制。CPU发起对MMIO地址的读写操作时，会被PCIe控制器接管，然后转化为对PCIe总线上连接的设备的访问请求。最终是读写外设寄存器还是外设内部存储空间，是由设备注册时的配置决定的。
+
+2. 没有启用虚拟IO时（IOVA)，外设访问流程如下：
+
+    1. 通过 PCIe Bus Address 访问PCIe RC，转化为 Physical Address(PA)
+    2. 通过PA访问内存
+
+    启用虚拟IO时（IOVA），外设访问流程如下：
+
+    1. 通过IOVA访问 IOMMU(x86平台)/SMMU(ARM平台)转化为 PCIe Bus Address
+    2. 通过 PCIe Bus Address 访问 PCIe RC，转化为 Physical Address(PA)
+    3. 通过PA访问内存
+
+    IOVA的访问流程可能有第二种实现流程，步骤1和步骤2对掉，即先通过 PCIe Bus Address 访问 PCIe RC 转化为 IOVA 后，再访问 IOMMU/SMMU 转化为 PA 去访存。
+
+    为了简单读写过程，其实可以理解PCIe外设通常直接通过PA或通过IOVA转化为PA后访存。一般情况下外设发出的总线地址的值等于物理地址，我们可以认为外设发出的就是物理地址。
+
+## A QP Buffer
+
+在回答 QP Buffer 问题前先说明两个比较重要的概念，QP Buffer 创建后全过程由 RNIC 使用，用户不需要关心和处理 QP Buffer。
+
+QP Buffer 和 MR Buffer 等由 RNIC 使用的 Buffer 必须 Pin 住（锁页），旨在防止换页后 RNIC 访问未知应用的地址空间。
+
+QP创建好后的所有Buffer如下图所示：
+
+![QP_Buffer1](https://github.com/Lion-tang/Remu-and-protection-in-RDMA/blob/master/images/QP_Buffer1.png)
+
+部分厂商在组织DMA Buffer Table时，固定了Buffer长度，因此将每个Buffer的长度放入QPC中，这样就不用在Buffer Table中多次记录不等长的Buffer长度了。
+
+![QP_Buffer1](https://github.com/Lion-tang/Remu-and-protection-in-RDMA/blob/master/images/QP_Buffer2.png)
+
+当然，Buffer Table也支持类似多级页表的多层次划分。一级Buffer Table下可再细分到二级Buffer Table。
+
+![QP_Buffer1](https://github.com/Lion-tang/Remu-and-protection-in-RDMA/blob/master/images/QP_Buffer3.png)
+
+1. QP Buffer 是存在内存中，但是组织方式是给RNIC看的DMA地址，即IOVA或PA。RNIC不能直接通过VA去访问内存，VA是给用户看的，和DMA地址不在一个地址空间
+2. 创建QPC必将陷入内核态，因为创建Buffer，Pin页的过程是由内核完成的，总的QP Buffer创建流程如下（控制路径）：
+    1. 用户APP调用`ibv_create_qp()`，用户态驱动申请虚拟内存，陷入内核态
+    2. 内核态获取Buffer信息，映射并Pin住物理页，获取DMA地址，组织DMA地址为Buffer Table
+    3. 填写QPC，内核态通知硬件关联QPN和已创建的QPC信息
+3. 使用QP时，只需要用户态驱动参与，这也是RDMA绕过内核态直接下发数据包的优势所在，总的QP Buffer使用流程如下（数据路径）：
+    1. 用户APP下发`ibv_post_send()`， 用户态驱动将WR转化为WQE，填写WQE到Queue Buffer，批量敲 DoorBell（让PCIe外设一次性DMA处理），DoorBell中包含了QPN和WQE偏移个数，偏移量用于计算WQE地址：**Buffer起始地址+每个WQE大小*偏移个数**
+    2. 硬件解析DoorBell中的QPN和WQE偏移个数，从QPC中获取到物理Buffer，获取并解析Buffer中的WQE（解析WQE在于需要把WQE按照和软件协商的格式提取数据，最后配合一些其他信息（比如QPC控制信息），就可以组装出一个完整数据包发出去了）
+
+请读者牢记，QP Buffer的创建和使用都是为了方便硬件直接工作，驱动会配合好硬件完成这部分工作。因此用户无需关心如何处理QP Buffer 和 WQE，把它当成黑盒直接使用即可
 
