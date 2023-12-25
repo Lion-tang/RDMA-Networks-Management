@@ -11,6 +11,7 @@
     - [Address Handle](#q-address-handle)
     - [Memory Window](#q-memory-window)
     - [QP Buffer](#q-qp-buffer)
+    - [MR Buffer](#q-mr-buffer)
 - [回答 A](#回答-a)
     - [概述](#a-概述)
     - [基本元素](#a-基本元素)
@@ -24,6 +25,7 @@
     - [Address Handle](#a-address-handle)
     - [Memory Window](#a-memory-window)
     - [QP Buffer](#a-qp-buffer)
+    - [MR Buffer](#a-mr-buffer)
 
 《RDMA杂谈》专栏目前是RDMA科普文章中质量最好的刊栏了，作者从RDMA技术的背景、基础资源知识、模拟程序的安装、内存地址基础、Buffer 工作机制等角度由浅入深地介绍了 RDMA。本说明旨在从一个普通读者的角度，记录阅读《RDMA杂谈》之后的思考和问题，通过这些问题，读者可以思考并检验一下对 RDMA 的理解程度，毕竟阅读之后要有一定的思考才能内化为自己的理解。
 
@@ -133,8 +135,15 @@
 ## Q QP Buffer
 
 1. QPC等信息是存在RNIC中还是内存？
-2. RNIC 如何创建一个自己看得懂的 QPC？（控制路径） 
+2. 如何创建一个RNIC 看得懂的 QP Buffer？（控制路径） 
 3. RNIC 如何从内存中 DMA 取出一个 WQE？（数据路径）
+
+## Q MR Buffer
+
+1. 为什么要设计MR这样一个机制？
+2. MRC包含了哪些信息？
+3. 如何注册一个RNIC看得懂的MR Buffer？（控制路径）
+4. RNIC如何向内存中MR读取/写入？（数据路径）
 
 # 回答 A
 
@@ -342,13 +351,40 @@ QP创建好后的所有Buffer如下图所示：
 ![QP_Buffer1](https://github.com/Lion-tang/Remu-and-protection-in-RDMA/blob/master/images/QP_Buffer3.png)
 
 1. QP Buffer 是存在内存中，但是组织方式是给RNIC看的DMA地址，即IOVA或PA。RNIC不能直接通过VA去访问内存，VA是给用户看的，和DMA地址不在一个地址空间
-2. 创建QPC必将陷入内核态，因为创建Buffer，Pin页的过程是由内核完成的，总的QP Buffer创建流程如下（控制路径）：
+2. CPU视角的Buffer地址直接给RNIC是看不懂的，RNIC要想直接操作QP Buffer，就要在内存中放置一个表格用于查询PA，该表格包含了QP Buffer PA等信息，该表叫做QPC。创建QPC必将陷入内核态，因为创建Buffer，Pin页的过程是由内核完成的，总的QP Buffer创建流程如下（控制路径）：
     1. 用户APP调用`ibv_create_qp()`，用户态驱动申请虚拟内存，陷入内核态
     2. 内核态获取Buffer信息，映射并Pin住物理页，获取DMA地址，组织DMA地址为Buffer Table
     3. 填写QPC，内核态通知硬件关联QPN和已创建的QPC信息
-3. 使用QP时，只需要用户态驱动参与，这也是RDMA绕过内核态直接下发数据包的优势所在，总的QP Buffer使用流程如下（数据路径）：
+3. 从内存DMA取出WQE的过程也是QP Buffer 的使用流程。使用QP时，只需要用户态驱动参与，这也是RDMA绕过内核态直接下发数据包的优势所在，总的QP Buffer使用流程如下（数据路径）：
     1. 用户APP下发`ibv_post_send()`， 用户态驱动将WR转化为WQE，填写WQE到Queue Buffer，批量敲 DoorBell（让PCIe外设一次性DMA处理），DoorBell中包含了QPN和WQE偏移个数，偏移量用于计算WQE地址：**Buffer起始地址+每个WQE大小*偏移个数**
     2. 硬件解析DoorBell中的QPN和WQE偏移个数，从QPC中获取到物理Buffer，获取并解析Buffer中的WQE（解析WQE在于需要把WQE按照和软件协商的格式提取数据，最后配合一些其他信息（比如QPC控制信息），就可以组装出一个完整数据包发出去了）
 
 请读者牢记，QP Buffer的创建和使用都是为了方便硬件直接工作，驱动会配合好硬件完成这部分工作。因此用户无需关心如何处理QP Buffer 和 WQE，把它当成黑盒直接使用即可
 
+## A MR Buffer
+
+在介绍MR Buffer之前，我们要明确CPU访存用的是VA，HCA访存用的是DMA地址，DMA地址可以是PA或IOVA(取决于是否开启虚拟化)，为了描述方便，回答提到的DMA地址均称为物理地址PA。
+
+1. RDMA想要通过VA读写远端内存是无法直接办到的。VA的地址直接给RNIC是看不懂的，因此注册一个MR，实际这个过程是注册了虚拟地址到物理地址的转换，这个转换表是给RNIC看的。有了转换表，RNIC可以查询这个转换表，找到VA对应的PA，进一步读写PA
+
+2. 类似QPC，RNIC需要内存中有一个表格记录MR的相关信息，这个表格就是MRC。但严格来说，MRC并没有像各个厂商对QPC一样形成统一的命名，Mellanox叫Mkey Context，海思叫MPT，本文主要统一为MRC。MRC包含了硬件通过VA访问MR所需的全部信息，比如**PD、起始VA、长度、L_Key、R_Key（只存后8bit，用于校验对比）、权限以及页表**的相关信息等。
+
+3. 这里说的是注册MR而不是创建MR，这一点有别于QP，因为Buffer变为MR Buffer之前已经由用户Malloc（未进行页对其）或mmap（页对其方式分配内存）创建好了。MR Buffer的注册流程如下（控制路径）：
+
+    1. 用户调用`ibv_reg_mr()`，用户态驱动陷入内核态。
+    2. 内核态驱动获取Buffer的信息，映射并Pin住物理页，获取物理页DMA地址，组织物理页（物理页放到一个连续的表中），产生L_Key和R_Key并返回给用户，填写信息到MRC
+    3. 硬件记录R_Key和MRC的关联关系，并记录物理Buffer信息
+
+4. 数据路径其实涉及Requester端（本地使用L_Key的一端）和Responder端（远程使用R_Key的一端），先以Write的Requester端为例说明RNIC如何向MR Buffer读写：
+
+    1. 用户下发WR，调用`ibv_post_send()`
+    2. 用户态驱动填写WQE并敲DoorBell
+    3. RNIC解析DoorBell，解析WQE，通过L_Key找到MRC，校验access权限和访问的地址范围，通过VA找到PA(核心是通过Page Table)，访存取出数据到Payload，组装数据包并发送
+
+    ![QP_Buffer1](https://github.com/Lion-tang/Remu-and-protection-in-RDMA/blob/master/images/MR_Buffer1.png)
+
+    Write的Responder端：
+
+    1. RNIC接收并解析数据包，通过RETH中的R_Key找到MRC，校验access权限和地址范围，通过VA找到PA（核心是通过Page Table），写入Payload到内存
+
+    ![QP_Buffer1](https://github.com/Lion-tang/Remu-and-protection-in-RDMA/blob/master/images/MR_Buffer2.png)
