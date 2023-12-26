@@ -388,3 +388,6 @@ QP创建好后的所有Buffer如下图所示：
     1. RNIC接收并解析数据包，通过RETH中的R_Key找到MRC，校验access权限和地址范围，通过VA找到PA（核心是通过Page Table），写入Payload到内存
 
     ![QP_Buffer1](https://github.com/Lion-tang/Remu-and-protection-in-RDMA/blob/master/images/MR_Buffer2.png)
+
+
+    未来可研究方向：RDMA网络拥塞（目前节点规模达到2000后开始丢包严重，阻塞严重，TCP在这个规模就没有问题，但是目前网络拥塞研究较多），广域网RDMA（目前RDMA只在数据中心内部使用，未来可能会在数据中心之间使用，但是跨数据中心的网络延迟较高，需要研究如何解决延迟问题），RDMA虚拟化（目前RDMA不支持虚拟化，需要研究如何支持虚拟化），RDMA 使能软件，比如让数据库、Spark、TensorFlow等应用使用RDMA
