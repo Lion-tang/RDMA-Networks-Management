@@ -136,3 +136,11 @@ def ghost_ack_hook(resp_pkt, save_resp_pkt):
 
     resp_pkt[roce.BTH].psn = 1
     return resp_pkt, save_resp_pkt
+
+def transit_qp_error_state(resp_pkt, save_resp_pkt):
+    import roce
+    from roce_enum import RC
+    
+    if resp_pkt[roce.BTH].psn == 3:
+        resp_pkt[roce.BTH].opcode = RC.RDMA_WRITE_LAST
+    return resp_pkt, save_resp_pkt

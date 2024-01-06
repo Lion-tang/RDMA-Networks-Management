@@ -1,0 +1,21 @@
+# transit a QP to a error state, referd to A2 in ReDMArk.
+side_1:
+  - name: prepare
+    mtu: 256
+  - name: connect_qp
+  - name: barrier
+  - name: remote_read
+    len: 1024
+    allow_err: true
+  - name: check_qp_status
+    status: ERR
+
+side_2: 
+  - name: prepare
+  - name: connect_qp
+    mtu: 256
+  - name: set_hook
+    hook_type: resp
+    hook_name: transit_qp_error_state
+  - name: barrier
+  - name: recv_pkt
