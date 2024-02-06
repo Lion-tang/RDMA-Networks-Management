@@ -12,6 +12,8 @@
 
 [X-RDMA](https://phantom-kryptops-329.notion.site/XRDMA-8dfbf7f6a2cd4b1b9835566108255e96?pvs=4)
 
+[Pythia](https://phantom-kryptops-329.notion.site/Pythia-1973bbda9d3941068496731438d5ba71?pvs=4)
 
+[RDMA Virtualization](https://phantom-kryptops-329.notion.site/RNIC-749aac5fb1454b0a85b7c6046fa5f012?pvs=4)
 
 other papers are on their way...
