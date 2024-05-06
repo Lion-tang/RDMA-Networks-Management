@@ -5,7 +5,7 @@ which is a wrapper around the [libibverbs] library. The emulator is written in R
 
 ## Environment
 
-1. first, run `prepare.sh` to install dependencies and build the emulator
+1. first, run `preparation.sh` to install dependencies and build the emulator
 
 2. then, edit `./test/run.sh`
 
